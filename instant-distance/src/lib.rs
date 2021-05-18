@@ -2,8 +2,6 @@ use std::cmp::{max, Ordering, Reverse};
 use std::collections::BinaryHeap;
 use std::collections::HashSet;
 use std::ops::Range;
-#[cfg(feature = "indicatif")]
-use std::sync::atomic::{self, AtomicUsize};
 
 #[cfg(feature = "indicatif")]
 use indicatif::ProgressBar;
@@ -191,7 +189,6 @@ where
         let progress = builder.progress;
         #[cfg(feature = "indicatif")]
         if let Some(bar) = &progress {
-            bar.set_draw_delta(1_000);
             bar.set_length(points.len() as u64);
             bar.set_message("Build index (preparation)");
         }
@@ -291,7 +288,7 @@ where
             #[cfg(feature = "indicatif")]
             progress,
             #[cfg(feature = "indicatif")]
-            done: AtomicUsize::new(0),
+            report_delta: points.len() as u32 / 200,
         }
         .build(nodes, ranges.into_iter(), &mut layers);
 
@@ -362,7 +359,7 @@ struct Construction<'a, P: Point> {
     #[cfg(feature = "indicatif")]
     progress: Option<ProgressBar>,
     #[cfg(feature = "indicatif")]
-    done: AtomicUsize,
+    report_delta: u32,
 }
 
 impl<'a, P: Point> Construction<'a, P> {
@@ -391,6 +388,11 @@ impl<'a, P: Point> Construction<'a, P> {
                     .into_par_iter()
                     .map(|zero| UpperNode::from_zero(&zero.read()))
                     .collect_into_vec(&mut layers[layer.0 - 1]);
+
+                #[cfg(feature = "indicatif")]
+                if let Some(bar) = &self.progress {
+                    bar.set_position(end as u64);
+                }
             }
         }
 
@@ -501,9 +503,8 @@ impl<'a, P: Point> Construction<'a, P> {
 
         #[cfg(feature = "indicatif")]
         if let Some(bar) = &self.progress {
-            let value = self.done.fetch_add(1, atomic::Ordering::Relaxed);
-            if value % 1000 == 0 {
-                bar.set_position(value as u64);
+            if new.0 % self.report_delta == 0 {
+                bar.set_position(new.0 as u64);
             }
         }
 
