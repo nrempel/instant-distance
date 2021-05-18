@@ -154,11 +154,13 @@ where
         &'a self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = (f32, &'a V)> + ExactSizeIterator + 'a {
-        self.hnsw.search(point, search).map(move |candidate| {
-            let value = &self.values[candidate.pid.0 as usize];
-            (candidate.distance.into(), value)
-        })
+    ) -> impl Iterator<Item = (f32, &'a P, &'a V)> + ExactSizeIterator + 'a {
+        self.hnsw
+            .search(point, search)
+            .map(move |(distance, pid, point)| {
+                let value = &self.values[pid.0 as usize];
+                (distance, point, value)
+            })
     }
 }
 
@@ -308,14 +310,22 @@ where
     /// The results are returned in the `out` parameter; the number of neighbors to search for
     /// is limited by the size of the `out` parameter, and the number of results found is returned
     /// in the return value.
-    pub fn search<'a>(
-        &self,
+    pub fn search<'a, 'b: 'a>(
+        &'b self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = Candidate> + ExactSizeIterator + 'a {
+    ) -> impl Iterator<Item = (f32, PointId, &'a P)> + ExactSizeIterator + 'a {
+        let map = move |candidate: Candidate| {
+            (
+                candidate.distance.into_inner(),
+                candidate.pid,
+                &self.points[candidate.pid.0 as usize],
+            )
+        };
+
         search.reset();
         if self.points.is_empty() {
-            return search.iter();
+            return search.iter().map(map);
         }
 
         search.visited.reserve_capacity(self.points.len());
@@ -337,7 +347,7 @@ where
             }
         }
 
-        search.iter()
+        search.iter().map(map)
     }
 
     /// Iterate over the keys and values in this index
