@@ -154,19 +154,26 @@ where
         &'a self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = (f32, &'a P, &'a V)> + ExactSizeIterator + 'a {
-        self.hnsw
-            .search(point, search)
-            .map(move |(distance, pid, point)| {
-                let value = &self.values[pid.0 as usize];
-                (distance, point, value)
-            })
+    ) -> impl Iterator<Item = MapItem<'a, P, V>> + ExactSizeIterator + 'a {
+        self.hnsw.search(point, search).map(move |item| MapItem {
+            distance: item.distance,
+            pid: item.pid,
+            point: item.point,
+            value: &self.values[item.pid.0 as usize],
+        })
     }
 
     /// Iterate over the keys and values in this index
     pub fn iter(&self) -> impl Iterator<Item = (PointId, &P)> {
         self.hnsw.iter()
     }
+}
+
+pub struct MapItem<'a, P, V> {
+    pub distance: f32,
+    pub pid: PointId,
+    pub point: &'a P,
+    pub value: &'a V,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -319,16 +326,9 @@ where
         &'b self,
         point: &P,
         search: &'a mut Search,
-    ) -> impl Iterator<Item = (f32, PointId, &'a P)> + ExactSizeIterator + 'a {
-        let map = move |candidate: Candidate| {
-            (
-                candidate.distance.into_inner(),
-                candidate.pid,
-                &self.points[candidate.pid.0 as usize],
-            )
-        };
-
+    ) -> impl Iterator<Item = Item<'b, P>> + ExactSizeIterator + 'a {
         search.reset();
+        let map = move |candidate| Item::new(candidate, self);
         if self.points.is_empty() {
             return search.iter().map(map);
         }
@@ -361,6 +361,22 @@ where
             .iter()
             .enumerate()
             .map(|(i, p)| (PointId(i as u32), p))
+    }
+}
+
+pub struct Item<'a, P> {
+    pub distance: f32,
+    pub pid: PointId,
+    pub point: &'a P,
+}
+
+impl<'a, P> Item<'a, P> {
+    fn new(candidate: Candidate, hnsw: &'a Hnsw<P>) -> Self {
+        Self {
+            distance: candidate.distance.into_inner(),
+            pid: candidate.pid,
+            point: &hnsw[candidate.pid],
+        }
     }
 }
 
