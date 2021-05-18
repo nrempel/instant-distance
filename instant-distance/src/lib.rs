@@ -162,6 +162,11 @@ where
                 (distance, point, value)
             })
     }
+
+    /// Iterate over the keys and values in this index
+    pub fn iter(&self) -> impl Iterator<Item = (PointId, &P)> {
+        self.hnsw.iter()
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
