@@ -371,37 +371,78 @@ big_array! { BigArray; DIMENSIONS }
 
 impl Point for FloatArray {
     fn distance(&self, rhs: &Self) -> f32 {
-        use std::arch::x86_64::{
-            _mm256_castps256_ps128, _mm256_extractf128_ps, _mm256_fmadd_ps, _mm256_load_ps,
-            _mm256_setzero_ps, _mm256_sub_ps, _mm_add_ps, _mm_add_ss, _mm_cvtss_f32, _mm_fmadd_ps,
-            _mm_load_ps, _mm_movehl_ps, _mm_shuffle_ps, _mm_sub_ps,
-        };
-        debug_assert_eq!(self.0.len() % 8, 4);
-
-        unsafe {
-            let mut acc_8x = _mm256_setzero_ps();
-            for (lh_slice, rh_slice) in self.0.chunks_exact(8).zip(rhs.0.chunks_exact(8)) {
-                let lh_8x = _mm256_load_ps(lh_slice.as_ptr());
-                let rh_8x = _mm256_load_ps(rh_slice.as_ptr());
-                let diff = _mm256_sub_ps(lh_8x, rh_8x);
-                acc_8x = _mm256_fmadd_ps(diff, diff, acc_8x);
-            }
-
-            let mut acc_4x = _mm256_extractf128_ps(acc_8x, 1); // upper half
-            let right = _mm256_castps256_ps128(acc_8x); // lower half
-            acc_4x = _mm_add_ps(acc_4x, right); // sum halves
-
-            let lh_4x = _mm_load_ps(self.0[DIMENSIONS - 4..].as_ptr());
-            let rh_4x = _mm_load_ps(rhs.0[DIMENSIONS - 4..].as_ptr());
-            let diff = _mm_sub_ps(lh_4x, rh_4x);
-            acc_4x = _mm_fmadd_ps(diff, diff, acc_4x);
-
-            let lower = _mm_movehl_ps(acc_4x, acc_4x);
-            acc_4x = _mm_add_ps(acc_4x, lower);
-            let upper = _mm_shuffle_ps(acc_4x, acc_4x, 0x1);
-            acc_4x = _mm_add_ss(acc_4x, upper);
-            _mm_cvtss_f32(acc_4x)
+        fn dot (a: &FloatArray, b: &FloatArray) -> f32 {
+            a.0.iter().zip(b.0.iter()).map(|(x, y)| x * y).sum()
         }
+
+        let norms: f32 = dot(self, self) * dot(&rhs,&rhs);
+        if norms > 0.0 {
+            1.0 - (dot(self, &rhs) / norms.sqrt())
+        } else {
+            0.0
+        }
+        
+        // use std::arch::x86_64::{
+        //     _mm256_add_ps, _mm256_castps256_ps128, _mm256_extractf128_ps, _mm256_fmadd_ps,
+        //     _mm256_load_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm_add_ps, _mm_add_ss, _mm_cvtss_f32,
+        //     _mm_fmadd_ps, _mm_load_ps, _mm_movehl_ps, _mm_shuffle_ps,
+        // };
+        // debug_assert_eq!(self.0.len() % 8, 4);
+
+        // unsafe {
+        //     let mut acc_8x = _mm256_setzero_ps();
+        //     let mut lmag_8x = _mm256_setzero_ps();
+        //     let mut rmag_8x = _mm256_setzero_ps();
+        //     for (lh_slice, rh_slice) in self.0.chunks_exact(8).zip(rhs.0.chunks_exact(8)) {
+        //         let lh_8x = _mm256_load_ps(lh_slice.as_ptr());
+        //         let rh_8x = _mm256_load_ps(rh_slice.as_ptr());
+        //         let mul = _mm256_mul_ps(lh_8x, rh_8x);
+        //         acc_8x = _mm256_add_ps(acc_8x, mul);
+
+        //         lmag_8x = _mm256_fmadd_ps(lh_8x, lh_8x, lmag_8x);
+        //         rmag_8x = _mm256_fmadd_ps(rh_8x, rh_8x, rmag_8x);
+        //     }
+
+        //     let mut acc_4x = _mm256_extractf128_ps(acc_8x, 1); // upper half
+        //     let right = _mm256_castps256_ps128(acc_8x); // lower half
+        //     acc_4x = _mm_add_ps(acc_4x, right); // sum halves
+
+        //     let mut lmag_4x = _mm256_extractf128_ps(lmag_8x, 1); // upper half
+        //     let right = _mm256_castps256_ps128(lmag_8x); // lower half
+        //     lmag_4x = _mm_add_ps(lmag_4x, right); // sum halves
+
+        //     let mut rmag_4x = _mm256_extractf128_ps(rmag_8x, 1); // upper half
+        //     let right = _mm256_castps256_ps128(rmag_8x); // lower half
+        //     rmag_4x = _mm_add_ps(rmag_4x, right); // sum halves
+
+        //     let lh_4x = _mm_load_ps(self.0[DIMENSIONS - 4..].as_ptr());
+        //     let rh_4x = _mm_load_ps(rhs.0[DIMENSIONS - 4..].as_ptr());
+        //     let mul = _mm_add_ps(lh_4x, rh_4x);
+        //     acc_4x = _mm_add_ps(mul, acc_4x);
+
+        //     lmag_4x = _mm_fmadd_ps(lh_4x, lh_4x, lmag_4x);
+        //     rmag_4x = _mm_fmadd_ps(rh_4x, rh_4x, rmag_4x);
+
+        //     let lower = _mm_movehl_ps(acc_4x, acc_4x);
+        //     acc_4x = _mm_add_ps(acc_4x, lower);
+        //     let upper = _mm_shuffle_ps(acc_4x, acc_4x, 0x1);
+        //     acc_4x = _mm_add_ss(acc_4x, upper);
+        //     let nom = _mm_cvtss_f32(acc_4x);
+
+        //     let lower = _mm_movehl_ps(lmag_4x, lmag_4x);
+        //     lmag_4x = _mm_add_ps(lmag_4x, lower);
+        //     let upper = _mm_shuffle_ps(lmag_4x, lmag_4x, 0x1);
+        //     lmag_4x = _mm_add_ss(lmag_4x, upper);
+        //     let lden = _mm_cvtss_f32(lmag_4x);
+
+        //     let lower = _mm_movehl_ps(rmag_4x, rmag_4x);
+        //     rmag_4x = _mm_add_ps(rmag_4x, lower);
+        //     let upper = _mm_shuffle_ps(rmag_4x, rmag_4x, 0x1);
+        //     rmag_4x = _mm_add_ss(rmag_4x, upper);
+        //     let rden = _mm_cvtss_f32(rmag_4x);
+
+        //     1.0 - (nom / (lden.sqrt() * rden.sqrt()))
+        // }
     }
 }
 
