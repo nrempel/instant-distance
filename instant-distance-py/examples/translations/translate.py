@@ -9,9 +9,10 @@ from progress.bar import IncrementalBar
 from progress.spinner import Spinner
 
 MAX_LINES = 100_000
-LANGS = ("en", "fr", "it")
+LANGS = ("en", "es")
 LANG_REPLACE = "$$lang"
-DL_TEMPLATE = f"https://dl.fbaipublicfiles.com/fasttext/vectors-aligned/wiki.{LANG_REPLACE}.align.vec"
+# DL_TEMPLATE = f"https://dl.fbaipublicfiles.com/fasttext/vectors-aligned/wiki.{LANG_REPLACE}.align.vec"
+DL_TEMPLATE = f"https://storage.googleapis.com/ids-scratch/wiki.{LANG_REPLACE}.align.vec"
 BUILT_IDX_PATH = f"./data/{'_'.join(LANGS)}.idx"
 WORD_MAP_PATH = f"./data/{'_'.join(LANGS)}.json"
 
@@ -120,10 +121,10 @@ async def translate(word):
     hnsw.search(embedding, search)
 
     # Print the results
-    for result in list(search)[:10]:
+    for result in list(search)[:50]:
         # We know that the first two characters of the value is the language code
         # from when we built the index.
-        print(f"Language: {result.value[:2]}, Translation: {result.value[2:]}")
+        print(f"Language: {result.value[:2]}, Translation: {result.value[2:]}, Distance: {result.distance}")
 
 
 async def main():

@@ -371,16 +371,28 @@ big_array! { BigArray; DIMENSIONS }
 
 impl Point for FloatArray {
     fn distance(&self, rhs: &Self) -> f32 {
+        
+        
         fn dot (a: &FloatArray, b: &FloatArray) -> f32 {
             a.0.iter().zip(b.0.iter()).map(|(x, y)| x * y).sum()
         }
-
-        let norms: f32 = dot(self, self) * dot(&rhs,&rhs);
-        if norms > 0.0 {
-            1.0 - (dot(self, &rhs) / norms.sqrt())
-        } else {
-            0.0
+        
+        fn dot (a: &FloatArray, b: &FloatArray) -> f32 {
+            a.0.iter().zip(b.0.iter()).map(|(x, y)| x * y).sum()
         }
+        
+
+
+        self
+
+
+
+        // let norms: f32 = dot(self, self) * dot(&rhs,&rhs);
+        // if norms > 0.0 {
+        //     1.0 - (dot(self, &rhs) / norms.sqrt())
+        // } else {
+        //     0.0
+        // }
         
         // use std::arch::x86_64::{
         //     _mm256_add_ps, _mm256_castps256_ps128, _mm256_extractf128_ps, _mm256_fmadd_ps,
