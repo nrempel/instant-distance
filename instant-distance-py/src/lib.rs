@@ -426,4 +426,4 @@ impl IntoPy<Py<PyAny>> for &'_ MapValue {
     }
 }
 
-const DIMENSIONS: usize = 300;
+const DIMENSIONS: usize = 128;
